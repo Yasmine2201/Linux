@@ -1,0 +1,31 @@
+Liens utiles : 
+    https://fr.linux-console.net/?p=14642
+
+
+Description générale de notre projet
+
+P6 Gestion d'utilisateurs NFS/NIS - interactif
+Faire un script permettant l'ajout/retrait d'un ou plusieurs utilisateurs via un script interactif.
+
+Le fonctionnement du domaine NIS est basé sur un modèle client-serveur. Les clients NIS
+(généralement des ordinateurs ou des périphériques réseau) envoient des requêtes au serveur
+NIS pour obtenir des informations de configuration. Le serveur NIS stocke ces informations 
+dans une base de données et les renvoie aux clients lorsqu'ils en ont besoin.
+-----------------
+Le mapping NIS est utilisé pour mettre en correspondance les informations de 
+configuration du réseau stockées dans la base de données NIS avec les fichiers
+de configuration du système d'exploitation. Cela permet aux clients NIS d'utiliser
+les informations de configuration du réseau stockées dans la base de données NIS 
+tout en continuant à utiliser les fichiers de configuration locaux pour d'autres 
+tâches de configuration du système.
+--------------
+Un domaine NIS (Network Information Service) est un groupe d'ordinateurs ou de
+périphériques réseau qui partagent une base de données centrale d'informations 
+de configuration du réseau.
+Un domaine NIS est un moyen de regrouper ces clients NIS et de leur fournir une
+base de données d'informations de configuration du réseau commune. Chaque domaine
+NIS a un nom unique et est géré par un ou plusieurs serveurs NIS. Les clients NIS sont
+configurés pour se joindre à un domaine NIS spécifique et pour utiliser les informations 
+de configuration du réseau stockées dans la base de données de ce domaine.
+
+
