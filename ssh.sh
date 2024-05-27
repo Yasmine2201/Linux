@@ -11,10 +11,28 @@ SSH_PASSWORD="a" # Changez ceci avec votre mot de passe SSH
 SUDO_PASSWORD="a" # Changez ceci avec votre mot de passe sudo
 
 # Fonction pour exécuter une commande sur le client via SSH avec sshpass
+sudo apt install -y nis
+sudo apt install -y rpcbind yp-tools ypbind
 
+sudo systemctl start ypbind
+sudo systemctl enable ypbind
+
+sudo systemctl start rpcbind
+sudo systemctl enable rpcbind
+
+sudo systemctl start ypbind
+sudo systemctl enable ypbind
+
+echo -e "domain Projet server 192.168.1.1\nypserver 192.168.1.1" | sudo tee /etc/yp.conf
+
+
+sudo sed -i 's/passwd: .*/passwd: files nis/' /etc/nsswitch.conf
+sudo sed -i 's/shadow: .*/shadow: files nis/' /etc/nsswitch.conf
+sudo sed -i 's/group: .*/group: files nis/' /etc/nsswitch.conf
+sudo sed -i 's/hosts: .*/hosts: files dns nis/' /etc/nsswitch.conf
+sudo sed -i 's/networks: .*/networks: files nis/' /etc/nsswitch.conf
 
 # Fonction pour exécuter une commande avec sudo sur le client via SSH avec sshpass
-
 
 
 

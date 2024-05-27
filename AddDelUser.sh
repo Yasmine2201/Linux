@@ -62,3 +62,46 @@ while IFS=' ' read -r action username password; do
         echo "Action non reconnue: $action"
     fi
 done < "$file_path"
+
+NFS_DIR="/mnt/nfs/shared"
+CLIENT_IP_RANGE="192.168.229.130"
+SERVER_IP="192.168.229.129" 
+
+sudo apt update
+sudo apt install -y nfs-kernel-server
+
+chown nobody:nogroup $NFS_DIR
+
+echo "$NFS_DIR $CLIENT_IP_RANGE(rw,sync,no_subtree_check)" >> /etc/exports
+
+exportfs -ra
+
+echo "Démarrage et activation du service NFS..."
+systemctl start nfs-kernel-server
+systemctl enable nfs-kernel-server
+
+echo "Configuration du serveur NFS terminée."
+
+CLIENT_HOST="user1" # Changez ceci avec l'adresse IP ou le nom d'hôte du client
+SSH_USER="max2" # Changez ceci avec votre nom d'utilisateur SSH
+NISDOMAIN="Projet" # Changez ceci avec votre nom de domaine NIS
+NISSERVER="192.168.229.129" # Changez ceci avec le nom ou l'adresse IP de votre serveur NIS
+SSH_PASSWORD="a" # Changez ceci avec votre mot de passe SSH
+SUDO_PASSWORD="a"
+CLIENT_IP="192.168.229.130"
+MOUNT_POINT="/mnt/nfs/shared"
+cd /home/max/CODE/Linux
+
+echo "Installation du client NFS sur le client $CLIENT_IP..."
+sshpass -p $SSH_PASS ssh $SSH_USER@$CLIENT_IP "sudo apt update"
+sshpass -p $SSH_PASS ssh $SSH_USER@$CLIENT_IP "sudo apt -y nfs-common"
+sshpass -p $SSH_PASS ssh $SSH_USER@$CLIENT_IP "sudo apt -y rpcbind"
+
+echo "Création du point de montage sur le client..."
+sshpass -p $SSH_PASS ssh $SSH_USER@$CLIENT_IP "sudo mkdir -p $MOUNT_POINT"
+
+echo "Montage du partage NFS sur le client..."
+sshpass -p $SSH_PASS ssh $SSH_USER@$CLIENT_IP "sudo mount -t nfs $SERVER_IP:$NFS_DIR $MOUNT_POINT"
+
+echo "Configuration du montage automatique au démarrage sur le client..."
+sshpass -p $SSH_PASS ssh $SSH_USER@$CLIENT_IP "echo $SERVER_IP:$NFS_DIR $MOUNT_POINT nfs defaults 0 0 | sudo tee -a /etc/fstab"
