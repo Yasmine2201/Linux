@@ -47,17 +47,14 @@ while IFS=' ' read -r action username password; do
             continue
         fi
 
-        sudo deluser "$username"
+        sudo deluser --remove-home "$username"
         if [[ $? -eq 0 ]]; then
             echo "L'utilisateur $username a été supprimé avec succès."
-            cd /home
-            if [[ -d "$username" ]]; then
-                sudo rm -rf "$username"
+                
                 path=$PWD
                 cd /var/yp
                 sudo make
                 cd $path
-            fi
         else
             echo "Erreur lors de la suppression de l'utilisateur $username."
         fi

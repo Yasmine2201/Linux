@@ -15,27 +15,20 @@ SUDO_PASSWORD="a" # Changez ceci avec votre mot de passe sudo
 
 # Fonction pour exécuter une commande avec sudo sur le client via SSH avec sshpass
 
-sshpass -p "$SSH_PASSWORD" ssh ${SSH_USER}@${CLIENT_HOST}
+
 
 
 run_sudo_command() {
-   echo $SUDO_PASSWORD | sudo -S $1
+    sshpass -p "$SSH_PASSWORD" ssh ${SSH_USER}@${CLIENT_HOST}  "echo ${SUDO_PASSWORD} | sudo -S \"${1}\""
 }
 
-#run_sudo_command "apt update"
-#run_sudo_command "apt install -y nis"
+run_sudo_command "apt update" 
+run_sudo_command "apt install -y nis"
 
-echo $SUDO_PASSWORD | sudo -S cat << EOF > /etc/default/nis
-    Ligne de texte
-    Seconde ligne de texte
-    Troisième ligne de texte
-EOF
-bash exit
 
-sshpass -p "$SSH_PASSWORD" ssh ${SSH_USER}@${CLIENT_HOST}
-
-#run_sudo_command "sudo sed -i '/^NISDOMAIN=/c\NISDOMAIN=${NISDOMAIN}' /etc/default/nis"
-#run_sudo_command "dommainname ${NISDOMAIN}"
+run_sudo_command " sed -i '/^NISDOMAIN=/c\NISDOMAIN=${NISDOMAIN}' /etc/default/nis"
+run_sudo_command " echo 'NISDOMAIN=${NISDOMAIN}' >> /etc/default/nis"
+run_sudo_command "dommainname ${NISDOMAIN}"
 #run_sudo_command "systemctl enable ypbind.service"
 #run_sudo_command "systemctl start ypbind.service"
 #
