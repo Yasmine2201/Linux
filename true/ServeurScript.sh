@@ -1,18 +1,54 @@
 #!/bin/bash
 
-# Fonction
-
+# Définir une fonction pour vérifier si un package est installé
 is_package_installed() {
     dpkg -l "$1" &> /dev/null
     return $?
 }
+# Définir une fonction pour vérifier et démarrer un service
+check_and_start_service() {
+    local SERVICE_NAME=$1
+
+    # Obtenir le statut du service
+    local STATUS=$(systemctl is-active "$SERVICE_NAME")
+
+    case "$STATUS" in
+        active)
+            echo "Le service $SERVICE_NAME est actif (en cours d'exécution)."
+            ;;
+        inactive)
+            echo "Le service $SERVICE_NAME est inactif."
+            echo "Tentative de démarrage du service $SERVICE_NAME..."
+            systemctl start "$SERVICE_NAME"
+            local NEW_STATUS=$(systemctl is-active "$SERVICE_NAME")
+            if [ "$NEW_STATUS" == "active" ]; then
+                echo "Le service $SERVICE_NAME est maintenant actif."
+            else
+                echo "Le service $SERVICE_NAME n'a pas réussi à démarrer (statut: $NEW_STATUS)."
+                exit 1
+            fi
+            ;;
+        failed)
+            echo "Le service $SERVICE_NAME a échoué."
+            exit 1
+            ;;
+        *)
+            echo "Statut inconnu pour le service $SERVICE_NAME: $STATUS."
+            exit 1
+            ;;
+    esac
+}
+
+########################################################################################
+######################################### NFS ##########################################
+########################################################################################
 
 # Vérifier et installer les paquets nécessaires pour NFS
 echo "Vérification des paquets NFS..."
 apt-get update
-packages1=("nfs-server" "rpcbind")
+packages_nfs=("nfs-server" "rpcbind")
 
-for package in "${packages[@]}"; do
+for package in "${packages_nfs[@]}"; do
     if is_package_installed "$package"; then
         echo "Le paquet $package est déjà installé."
     else
@@ -23,11 +59,14 @@ done
 
 
 # Démarrer et vérifier le statut des services NFS
-echo "Démarrage des services NFS..."
-systemctl start nfs-server
-systemctl start rpcbind
-systemctl status nfs-server
-systemctl status rpcbind
+
+# Définir le tableau des services
+services_nfs=("nfs-server" "rpcbind")
+
+# Boucle pour vérifier et démarrer chaque service
+for SERVICE_NAME in "${services_nfs[@]}"; do
+    check_and_start_service "$SERVICE_NAME"
+done
 
 # Déclarer le répertoire à exporter dans /etc/exports
 echo "Déclaration du répertoire à exporter..."
@@ -47,13 +86,13 @@ echo "Vérification des exports..."
 showmount --e
 
 ########################################################################################
-########################################################################################
+######################################### NIS ##########################################
 ########################################################################################
 
-packages2=("ypserv" "rpcbind")
+packages_nis=("ypserv" "rpcbind")
 
 # Vérifier et installer les paquets nécessaires pour NIS
-for package in "${packages2[@]}"; do
+for package in "${packages_nis[@]}"; do
     if is_package_installed "$package"; then
         echo "Le paquet $package est déjà installé."
     else
@@ -66,58 +105,24 @@ done
 # Démarrer et vérifier le statut des services NIS
 echo "Démarrage des services NIS..."
 
-services=("ypserv" "rpcbind" "yppasswdd") # Ajoutez d'autres services si nécessaire
-
-# Boucle sur chaque service dans le tableau
+services=("ypserv" "rpcbind") 
+# Boucle pour vérifier et démarrer chaque service
 for SERVICE_NAME in "${services[@]}"; do
-    # Obtenir le statut du service
-    STATUS=$(systemctl is-active "$SERVICE_NAME")
-
-    # Afficher le statut
-    if [ "$STATUS" == "active" ]; then
-        echo "Le service $SERVICE_NAME est actif (en cours d'exécution)."
-    elif [ "$STATUS" == "inactive" ]; then
-        echo "Le service $SERVICE_NAME est inactif."
-        
-        systemctl start $SERVICE_NAME
-
-        echo "Le service $SERVICE_NAME démarre."
-        
-        resultat=$(systemctl is-active "$SERVICE_NAME")
-
-        if [ "$resultat" == "failed" ]; then
-            echo "Le service $SERVICE_NAME n'a pas réussi à démarrer (failed)(exit)."
-            exit 1
-        elif [ "$resultat" == "inactive" ]; then
-                echo "Le service $SERVICE_NAME n'a pas réussi à démarrer (inactive)(exit)."
-                exit 1
-        else
-            echo "Le service $SERVICE_NAME est actif (en cours d'exécution)."
-        fi
-
-    elif [ "$STATUS" == "failed" ]; then
-        echo "Le service $SERVICE_NAME a échoué."
-        exit 1
-    fi
+    check_and_start_service "$SERVICE_NAME"
 done
-
 
 # Déclarer le domaine NIS
 echo "Déclaration du domaine NIS..."
 echo "projetLinux" > /etc/defaultdomain
 domainname projetLinux
 
-# Modification du MakeFilefait pour inclure passwd, group, hosts, shadow fait manuellement
+# Modification manuelle du MakeFilefait pour inclure passwd, group, hosts, shadow fait 
 
-
-########################################################################################
-########################################################################################
-########################################################################################
+# Ajout ou Suppression des utilisateurs
 
 echo "ajout/suppression de(s) l'utilisateur(s)"
 
 read -p "Chemin du fichier contenant les utilisateurs: " file_path
-
 # Vérifie si le fichier existe
 if [[ ! -f "$file_path" ]]; then
     echo "Erreur: Le fichier $file_path n'existe pas"
@@ -137,10 +142,10 @@ while IFS=' ' read -r action username password; do
             continue
         fi
 
-        sudo adduser --disabled-password --gecos "" "$username"
+        adduser --disabled-password --gecos "" "$username"
         if [[ $? -eq 0 ]]; then
             echo "L'utilisateur $username a été créé avec succès."
-            echo "$username:$password" | sudo chpasswd
+            echo "$username:$password" | chpasswd
         else
             echo "Erreur lors de la création de l'utilisateur $username."
         fi
@@ -152,7 +157,7 @@ while IFS=' ' read -r action username password; do
             continue
         fi
 
-        sudo deluser --remove-home "$username"
+        deluser --remove-home "$username"
         if [[ $? -eq 0 ]]; then
             echo "L'utilisateur $username a été supprimé avec succès."
         else
@@ -163,9 +168,11 @@ while IFS=' ' read -r action username password; do
     fi
 done < "$file_path"
 
+# Mettre à jour les maps NIS
 make -C /var/yp
 
-systemctl restart ypserv
-systemctl restart yppasswdd
+# Démarrer le service yppasswdd
+check_and_start_service "yppasswdd"
 
+# Fin de la configuration serveur
 echo "Configuration du serveur terminée."
