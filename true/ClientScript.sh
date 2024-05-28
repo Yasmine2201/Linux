@@ -1,21 +1,65 @@
 #!/bin/bash
 
-# Fonction
+# Définir une fonction pour vérifier si un package est installé
 is_package_installed() {
     dpkg -l "$1" &> /dev/null
     return $?
 }
-
+# Définir une fonction pour ajouter 'nis' à une entrée si elle est manquante
 add_nis_if_missing() {
     local entry="$1"
-    if ! grep -qE "^${entry}:.*nis" $NSSWITCH_FILE; then
+    echo "Traitement de l'entrée : $entry"
+    
+    if ! grep -qE "^${entry}:.*nis" "/etc/nsswitch.conf"; then
         echo "Ajout de 'nis' à la ligne ${entry}:"
-        sed -i "/^${entry}:/ s/\$/ nis/" $NSSWITCH_FILE
-        echo "'nis' ajouté à ${entry}."
+        sudo sed -i "/^${entry}:/ s/\$/ nis/" "/etc/nsswitch.conf"
+        if [ $? -eq 0 ]; then
+            echo "'nis' ajouté à ${entry}."
+        else
+            echo "Erreur lors de l'ajout de 'nis' à ${entry}."
+        fi
     else
         echo "'nis' est déjà présent dans ${entry}."
     fi
 }
+
+# Définir une fonction pour vérifier et démarrer un service
+check_and_start_service() {
+    local SERVICE_NAME=$1
+
+    # Obtenir le statut du service
+    local STATUS=$(systemctl is-active "$SERVICE_NAME")
+
+    case "$STATUS" in
+        active)
+            echo "Le service $SERVICE_NAME est actif (en cours d'exécution)."
+            ;;
+        inactive)
+            echo "Le service $SERVICE_NAME est inactif."
+            echo "Tentative de démarrage du service $SERVICE_NAME..."
+            systemctl start "$SERVICE_NAME"
+            local NEW_STATUS=$(systemctl is-active "$SERVICE_NAME")
+            if [ "$NEW_STATUS" == "active" ]; then
+                echo "Le service $SERVICE_NAME est maintenant actif."
+            else
+                echo "Le service $SERVICE_NAME n'a pas réussi à démarrer (statut: $NEW_STATUS)."
+                exit 1
+            fi
+            ;;
+        failed)
+            echo "Le service $SERVICE_NAME a échoué."
+            exit 1
+            ;;
+        *)
+            echo "Statut inconnu pour le service $SERVICE_NAME: $STATUS."
+            exit 1
+            ;;
+    esac
+}
+
+########################################################################################
+####################################### NFS / NIS ######################################
+########################################################################################
 
 # Vérifier et installer les paquets nécessaires pour NFS et NIS
 echo "Vérification des paquets NFS et NIS..."
@@ -36,8 +80,11 @@ done
 
 # Démarrer et vérifier le statut des services rpcbind
 echo "Démarrage du service rpcbind..."
-systemctl start rpcbind
-systemctl status rpcbind
+check_and_start_service "rpcbind"
+
+####################################
+    # systemctl status rpcbind
+####################################
 
 # Créer le répertoire pour monter le /home du serveur
 echo "Création du répertoire pour le montage NFS..."
@@ -60,6 +107,8 @@ grep -qxF "$adresse_IP_serveur:/home /home/mounted_home nfs defaults 0 0" /etc/f
 if [ $? -ne 0 ]; then
     echo "L'entrée n'existe pas. Ajout de l'entrée au fichier fstab..."
     echo "$adresse_IP_serveur:/home /home/mounted_home nfs defaults 0 0" >> /etc/fstab
+else
+    echo "L'entrée existe déjà dans /etc/fstab."
 fi
 
 # Déclarer le domaine NIS
@@ -73,9 +122,10 @@ echo "domain projetLinux server $adresse_IP_serveur" > /etc/yp.conf
 
 
 # Entrées à vérifier et à modifier si nécessaire
-entries=("passwd" "group" "shadow" "hosts")
+entries=("passwd" "group" "shadow""hosts")
 
 # Vérification et modification des lignes
+echo "Vérification et modification des fichiers..."
 for entry in "${entries[@]}"; do
     add_nis_if_missing "$entry"
 done
@@ -83,8 +133,11 @@ done
 
 # Démarrer les services NIS
 echo "Démarrage des services NIS..."
-systemctl start ypbind
-systemctl status ypbind
+check_and_start_service "ypbind"
+
+####################################
+    #systemctl status ypbind
+####################################
 
 # Créer des liens symboliques de /home/mounted_home vers /home
 echo "Création des liens symboliques pour les utilisateurs..."
