@@ -5,23 +5,6 @@ is_package_installed() {
     dpkg -l "$1" &> /dev/null
     return $?
 }
-# Définir une fonction pour ajouter 'nis' à une entrée si elle est manquante
-add_nis_if_missing() {
-    local entry="$1"
-    echo "Traitement de l'entrée : $entry"
-    
-    if ! grep -qE "^${entry}:.*nis" "/etc/nsswitch.conf"; then
-        echo "Ajout de 'nis' à la ligne ${entry}:"
-        sudo sed -i "/^${entry}:/ s/\$/ nis/" "/etc/nsswitch.conf"
-        if [ $? -eq 0 ]; then
-            echo "'nis' ajouté à ${entry}."
-        else
-            echo "Erreur lors de l'ajout de 'nis' à ${entry}."
-        fi
-    else
-        echo "'nis' est déjà présent dans ${entry}."
-    fi
-}
 
 # Définir une fonction pour vérifier et démarrer un service
 check_and_start_service() {
@@ -56,9 +39,25 @@ check_and_start_service() {
             ;;
     esac
 }
+add_nis_if_missing() {
+    local entry="$1"
+    echo "Traitement de l'entrée : $entry"
+    
+    if ! grep -qE "^${entry}:.*nis" "/etc/nsswitch.conf"; then
+        echo "Ajout de 'nis' à la ligne ${entry}:"
+        sudo sed -i "/^${entry}:/ s/\$/ nis/" "/etc/nsswitch.conf"
+        if [ $? -eq 0 ]; then
+            echo "'nis' ajouté à ${entry}."
+        else
+            echo "Erreur lors de l'ajout de 'nis' à ${entry}."
+        fi
+    else
+        echo "'nis' est déjà présent dans ${entry}."
+    fi
+}
 
 ########################################################################################
-####################################### NFS / NIS ######################################
+######################################## NFS/NIS #######################################
 ########################################################################################
 
 # Vérifier et installer les paquets nécessaires pour NFS et NIS
@@ -77,21 +76,20 @@ for package in "${packages[@]}"; do
     fi
 done
 
+## NFS ##
 
 # Démarrer et vérifier le statut des services rpcbind
 echo "Démarrage du service rpcbind..."
 check_and_start_service "rpcbind"
 
-####################################
-    # systemctl status rpcbind
-####################################
+# systemctl status rpcbind
 
 # Créer le répertoire pour monter le /home du serveur
 echo "Création du répertoire pour le montage NFS..."
 mkdir -p /home/mounted_home
 
 
-adresse_IP_serveur="192.168.229.129"
+adresse_IP_serveur=server
 # Monter le répertoire /home du serveur
 echo "Montage du répertoire /home du serveur..."
 mount -t nfs $adresse_IP_serveur:/home /home/mounted_home
@@ -110,6 +108,8 @@ if [ $? -ne 0 ]; then
 else
     echo "L'entrée existe déjà dans /etc/fstab."
 fi
+
+## NIS ##
 
 # Déclarer le domaine NIS
 echo "Déclaration du domaine NIS..."
@@ -135,9 +135,7 @@ done
 echo "Démarrage des services NIS..."
 check_and_start_service "ypbind"
 
-####################################
-    #systemctl status ypbind
-####################################
+#systemctl status ypbind
 
 # Créer des liens symboliques de /home/mounted_home vers /home
 echo "Création des liens symboliques pour les utilisateurs..."
